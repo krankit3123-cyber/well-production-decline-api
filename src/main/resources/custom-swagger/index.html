@@ -1,0 +1,453 @@
+<!-- Custom Swagger UI with integrated Decline Curve Visualization -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Swagger UI — Well Production Decline API</title>
+    <link rel="stylesheet" type="text/css" href="./swagger-ui.css">
+    <link rel="icon" type="image/png" href="./favicon-32x32.png" sizes="32x32">
+    <link rel="icon" type="image/png" href="./favicon-16x16.png" sizes="16x16">
+
+    <!-- Chart.js for inline forecast visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+    <style>
+        html { box-sizing: border-box; overflow-y: scroll; }
+        *, *::before, *::after { box-sizing: inherit; }
+        body { margin: 0; background: #fafafa; }
+
+        /* ===== Forecast Chart Injection Styles (Light Theme) ===== */
+        .forecast-chart-wrapper {
+            margin: 20px 0 8px 0;
+            padding: 24px 28px;
+            background: #ffffff;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+            animation: chartFadeIn 0.4s ease forwards;
+        }
+
+        @keyframes chartFadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .forecast-chart-wrapper .chart-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .forecast-chart-wrapper .chart-header h4 {
+            color: #1e293b;
+            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .forecast-chart-wrapper .chart-header .tag {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            background: #f0f9ff;
+            color: #0369a1;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            border: 1px solid #bae6fd;
+        }
+
+        /* Metric Cards */
+        .forecast-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .forecast-metric-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 14px 16px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .forecast-metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+        }
+        .forecast-metric-card.m-eur::before    { background: #d97706; }
+        .forecast-metric-card.m-type::before   { background: #7c3aed; }
+        .forecast-metric-card.m-qi::before     { background: #2563eb; }
+        .forecast-metric-card.m-di::before     { background: #7c3aed; }
+        .forecast-metric-card.m-b::before      { background: #059669; }
+        .forecast-metric-card.m-limit::before  { background: #dc2626; }
+
+        .forecast-metric-card .m-label {
+            font-size: 9px;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 4px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .forecast-metric-card .m-value {
+            font-size: 17px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .forecast-metric-card .m-unit {
+            font-size: 10px;
+            color: #94a3b8;
+            margin-top: 2px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .m-value.v-eur   { color: #b45309; }
+        .m-value.v-type  { color: #6d28d9; }
+        .m-value.v-qi    { color: #1d4ed8; }
+        .m-value.v-di    { color: #6d28d9; }
+        .m-value.v-b     { color: #047857; }
+        .m-value.v-limit { color: #b91c1c; }
+
+        /* Chart Grid */
+        .forecast-charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .forecast-chart-panel {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .forecast-chart-panel h5 {
+            color: #475569;
+            margin: 0 0 12px 0;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .forecast-chart-panel canvas {
+            width: 100% !important;
+            max-height: 300px;
+        }
+
+        @media (max-width: 900px) {
+            .forecast-charts-grid { grid-template-columns: 1fr; }
+            .forecast-metrics-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+
+    <script src="./swagger-ui-bundle.js" charset="UTF-8"></script>
+    <script src="./swagger-ui-standalone-preset.js" charset="UTF-8"></script>
+
+    <script>
+    /* =================================================================
+     *  1. SWAGGER UI INITIALIZATION
+     *     Fetches SpringDoc config and initializes with a custom
+     *     responseInterceptor for chart injection.
+     * ================================================================= */
+
+    window.onload = async function() {
+        // Resolve SpringDoc swagger-config URL
+        const params = new URLSearchParams(window.location.search);
+        const configUrl = params.get('configUrl') || '/api-docs/swagger-config';
+
+        let springDocConfig = {};
+        try {
+            const res = await fetch(configUrl);
+            springDocConfig = await res.json();
+        } catch (e) {
+            springDocConfig = { url: '/api-docs' };
+        }
+
+        // Remove meta keys that shouldn't be re-passed
+        delete springDocConfig.configUrl;
+        delete springDocConfig.validatorUrl;
+
+        const ui = SwaggerUIBundle(Object.assign({}, springDocConfig, {
+            dom_id: '#swagger-ui',
+            deepLinking: true,
+            presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIStandalonePreset
+            ],
+            plugins: [
+                SwaggerUIBundle.plugins.DownloadUrl
+            ],
+            layout: 'StandaloneLayout',
+
+            /* ---- Chart injection hook ---- */
+            responseInterceptor: function(response) {
+                try {
+                    var data;
+                    if (response.body && typeof response.body === 'object') {
+                        data = response.body;
+                    } else if (response.text) {
+                        data = JSON.parse(response.text);
+                    }
+                    if (data && data.timeSeries && Array.isArray(data.timeSeries) && data.timeSeries.length > 0) {
+                        scheduleForecastChartInjection(data);
+                    }
+                } catch (ignored) {}
+                return response;
+            }
+        }));
+
+        window.ui = ui;
+    };
+
+    /* =================================================================
+     *  2. CHART INJECTION
+     * ================================================================= */
+
+    var _chartInstances = [];
+    var _uniqueId = 0;
+
+    /**
+     * Schedules chart injection after Swagger UI finishes rendering
+     * the response DOM. Uses a retry loop because the DOM update
+     * is asynchronous.
+     */
+    function scheduleForecastChartInjection(data) {
+        var attempts = 0;
+        var maxAttempts = 15;
+
+        function tryInject() {
+            attempts++;
+
+            // Find live-response containers that Swagger UI just rendered
+            var targets = document.querySelectorAll(
+                'table.live-responses-table, .responses-inner .response'
+            );
+
+            if (targets.length > 0) {
+                injectForecastChart(targets[targets.length - 1], data);
+            } else if (attempts < maxAttempts) {
+                setTimeout(tryInject, 200);
+            }
+        }
+
+        // Small initial delay to let Swagger UI start rendering
+        setTimeout(tryInject, 300);
+    }
+
+    function injectForecastChart(targetElement, data) {
+        // Clean up old chart wrappers and instances
+        document.querySelectorAll('.forecast-chart-wrapper').forEach(function(el) { el.remove(); });
+        _chartInstances.forEach(function(c) { try { c.destroy(); } catch(e) {} });
+        _chartInstances = [];
+
+        _uniqueId++;
+        var rateCanvasId  = 'fc-rate-' + _uniqueId;
+        var cumCanvasId   = 'fc-cum-'  + _uniqueId;
+        var ts = data.timeSeries;
+        var ecoLimit = data.economicLimit != null ? parseFloat(data.economicLimit) : null;
+
+        // Build the wrapper HTML
+        var wrapper = document.createElement('div');
+        wrapper.className = 'forecast-chart-wrapper';
+        wrapper.innerHTML =
+            '<div class="chart-header">' +
+                '<h4>Decline Curve Visualization</h4>' +
+                '<span class="tag">ARPS 1945</span>' +
+            '</div>' +
+            '<div class="forecast-metrics-grid">' +
+                metricCard('m-eur',   'EUR',           fmtNum(data.eur),            'v-eur',   'bbl') +
+                metricCard('m-type',  'Decline Type',  data.declineType || '\u2014', 'v-type',  'model') +
+                metricCard('m-qi',    'Initial Rate',  fmtNum(data.initialRate),     'v-qi',    'bbl/day') +
+                metricCard('m-di',    'Decline Rate',  data.initialDeclineRate,      'v-di',    'frac/day') +
+                metricCard('m-b',     'b-Factor',      data.bFactor,                 'v-b',     'curvature') +
+                metricCard('m-limit', 'Econ. Limit',   ecoLimit != null ? fmtNum(ecoLimit) : 'N/A', 'v-limit', 'bbl/day') +
+            '</div>' +
+            '<div class="forecast-charts-grid">' +
+                '<div class="forecast-chart-panel">' +
+                    '<h5>Production Rate Decline</h5>' +
+                    '<canvas id="' + rateCanvasId + '"></canvas>' +
+                '</div>' +
+                '<div class="forecast-chart-panel">' +
+                    '<h5>Cumulative Production</h5>' +
+                    '<canvas id="' + cumCanvasId + '"></canvas>' +
+                '</div>' +
+            '</div>';
+
+        // Insert after the target element (the response table/section)
+        var parent = targetElement.closest('.responses-inner') || targetElement.parentNode;
+        parent.appendChild(wrapper);
+
+        // Prepare data arrays
+        var labels = [], rates = [], cumulatives = [], belowLimit = [];
+        for (var i = 0; i < ts.length; i++) {
+            labels.push(ts[i].date || ('Month ' + ts[i].month));
+            rates.push(parseFloat(ts[i].productionRate));
+            cumulatives.push(parseFloat(ts[i].cumulativeProduction));
+            belowLimit.push(!!ts[i].belowEconomicLimit);
+        }
+
+        // ---- Rate Chart ----
+        var rateCtx = document.getElementById(rateCanvasId);
+        if (rateCtx) {
+            var rateDatasets = [{
+                label: 'Rate (bbl/day)',
+                data: rates,
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.06)',
+                pointBackgroundColor: belowLimit.map(function(b) { return b ? '#dc2626' : '#2563eb'; }),
+                pointRadius: rates.length > 60 ? 1 : 2.5,
+                pointHoverRadius: 5,
+                borderWidth: 2,
+                fill: true,
+                tension: 0.35
+            }];
+
+            if (ecoLimit !== null) {
+                rateDatasets.push({
+                    label: 'Economic Limit (' + ecoLimit + ')',
+                    data: new Array(labels.length).fill(ecoLimit),
+                    borderColor: '#dc2626',
+                    borderDash: [6, 3],
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    fill: false
+                });
+            }
+
+            _chartInstances.push(new Chart(rateCtx.getContext('2d'), {
+                type: 'line',
+                data: { labels: labels, datasets: rateDatasets },
+                options: makeChartOpts('Rate (bbl/day)')
+            }));
+        }
+
+        // ---- Cumulative Chart ----
+        var cumCtx = document.getElementById(cumCanvasId);
+        if (cumCtx) {
+            _chartInstances.push(new Chart(cumCtx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Cumulative (bbl)',
+                        data: cumulatives,
+                        borderColor: '#059669',
+                        backgroundColor: 'rgba(5, 150, 105, 0.06)',
+                        pointBackgroundColor: '#059669',
+                        pointRadius: cumulatives.length > 60 ? 1 : 2.5,
+                        pointHoverRadius: 5,
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.35
+                    }]
+                },
+                options: makeChartOpts('Cumulative Production (bbl)')
+            }));
+        }
+
+        // Scroll to chart
+        wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    /* =================================================================
+     *  3. HELPERS
+     * ================================================================= */
+
+    function metricCard(cls, label, value, valCls, unit) {
+        return '<div class="forecast-metric-card ' + cls + '">' +
+                   '<div class="m-label">' + label + '</div>' +
+                   '<div class="m-value ' + valCls + '">' + value + '</div>' +
+                   '<div class="m-unit">' + unit + '</div>' +
+               '</div>';
+    }
+
+    function makeChartOpts(yLabel) {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#475569',
+                        font: { size: 11, family: '-apple-system, BlinkMacSystemFont, sans-serif' },
+                        usePointStyle: true,
+                        padding: 14
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#ffffff',
+                    titleColor: '#1e293b',
+                    bodyColor: '#475569',
+                    borderColor: '#e2e8f0',
+                    borderWidth: 1,
+                    cornerRadius: 6,
+                    padding: 10,
+                    callbacks: {
+                        label: function(ctx) {
+                            return ctx.dataset.label + ': ' + fmtNum(ctx.parsed.y);
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                    ticks: {
+                        color: '#64748b',
+                        font: { size: 10, family: '-apple-system, BlinkMacSystemFont, sans-serif' },
+                        maxTicksLimit: 10,
+                        maxRotation: 45
+                    }
+                },
+                y: {
+                    grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                    title: {
+                        display: true,
+                        text: yLabel,
+                        color: '#475569',
+                        font: { size: 11, family: '-apple-system, BlinkMacSystemFont, sans-serif' }
+                    },
+                    ticks: {
+                        color: '#475569',
+                        font: { size: 10, family: '-apple-system, BlinkMacSystemFont, sans-serif' },
+                        callback: function(v) { return fmtNum(v); }
+                    }
+                }
+            }
+        };
+    }
+
+    function fmtNum(n) {
+        if (n === null || n === undefined) return '\u2014';
+        var v = parseFloat(n);
+        if (isNaN(v)) return n;
+        if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(2) + 'M';
+        if (Math.abs(v) >= 1e3) return v.toLocaleString('en-US', { maximumFractionDigits: 1 });
+        return v.toLocaleString('en-US', { maximumFractionDigits: 4 });
+    }
+    </script>
+</body>
+</html>
